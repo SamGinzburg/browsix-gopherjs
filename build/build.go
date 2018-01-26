@@ -256,7 +256,8 @@ func parseAndAugment(pkg *build.Package, isTest bool, fileSet *token.FileSet) ([
 		},
 	}
 
-	if nativesPkg, err := Import(importPath, 0, "", nil); err == nil {
+	_ = nativesContext
+	if nativesPkg, err := Import("github.com/SamGinzburg/browsix-gopherjs/compiler/natives/"+importPath, 0, "", nil); err == nil {
 		names := nativesPkg.GoFiles
 		if isTest {
 			names = append(names, nativesPkg.TestGoFiles...)
@@ -265,16 +266,10 @@ func parseAndAugment(pkg *build.Package, isTest bool, fileSet *token.FileSet) ([
 			names = nativesPkg.XTestGoFiles
 		}
 		for _, name := range names {
-			fullPath := path.Join(nativesPkg.Dir, name)
-			r, err := nativesContext.OpenFile(fullPath)
+			file, err := parser.ParseFile(fileSet, filepath.Join(nativesPkg.Dir, name), nil, parser.ParseComments)
 			if err != nil {
 				panic(err)
 			}
-			file, err := parser.ParseFile(fileSet, fullPath, r, parser.ParseComments)
-			if err != nil {
-				panic(err)
-			}
-			r.Close()
 			for _, decl := range file.Decls {
 				switch d := decl.(type) {
 				case *ast.FuncDecl:

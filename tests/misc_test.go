@@ -9,7 +9,7 @@ import (
 	"time"
 	"vendored"
 
-	"github.com/bpowers/browsix-gopherjs/tests/otherpkg"
+	"github.com/SamGinzburg/browsix-gopherjs/tests/otherpkg"
 )
 
 func TestSyntax1(t *testing.T) {
@@ -534,4 +534,92 @@ func TestTrivialSwitch(t *testing.T) {
 		return
 	}
 	t.Fail()
+}
+
+func TestTupleFnReturnImplicitCast(t *testing.T) {
+	var ycalled int = 0
+	x := func(fn func() (int, error)) (interface{}, error) {
+		return fn()
+	}
+	y, _ := x(func() (int, error) {
+		ycalled++
+		return 14, nil
+	})
+	if y != 14 || ycalled != 1 {
+		t.Fail()
+	}
+}
+
+var tuple2called = 0
+
+func tuple1() (interface{}, error) {
+	return tuple2()
+}
+func tuple2() (int, error) {
+	tuple2called++
+	return 14, nil
+}
+func TestTupleReturnImplicitCast(t *testing.T) {
+	x, _ := tuple1()
+	if x != 14 || tuple2called != 1 {
+		t.Fail()
+	}
+}
+
+func TestDeferNamedTupleReturnImplicitCast(t *testing.T) {
+	var ycalled int = 0
+	var zcalled int = 0
+	z := func() {
+		zcalled++
+	}
+	x := func(fn func() (int, error)) (i interface{}, e error) {
+		defer z()
+		i, e = fn()
+		return
+	}
+	y, _ := x(func() (int, error) {
+		ycalled++
+		return 14, nil
+	})
+	if y != 14 || ycalled != 1 || zcalled != 1 {
+		t.Fail()
+	}
+}
+
+func TestSliceOfString(t *testing.T) {
+	defer func() {
+		if err := recover(); err == nil || !strings.Contains(err.(error).Error(), "slice bounds out of range") {
+			t.Fail()
+		}
+	}()
+
+	str := "foo"
+	print(str[0:10])
+}
+
+type R struct{ v int }
+
+func (r R) Val() int {
+	return r.v
+}
+
+func TestReceiverCapture(t *testing.T) {
+	r := R{1}
+	f1 := r.Val
+	r = R{2}
+	f2 := r.Val
+	if f1() != 1 || f2() != 2 {
+		t.Fail()
+	}
+}
+
+func TestTypeConversion(t *testing.T) {
+	i1, i2, i3 := 4, 2, 2
+	if (i1-i2)/i3 != int(i1-i2)/int(i3) {
+		t.Fail()
+	}
+	f1, f2, f3 := 4.0, 2.0, 2.0
+	if (f1-f2)/f3 != float64(f1-f2)/float64(f3) {
+		t.Fail()
+	}
 }

@@ -13,8 +13,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/bpowers/browsix-gopherjs/compiler/analysis"
-	"github.com/bpowers/browsix-gopherjs/compiler/typesutil"
+	"github.com/SamGinzburg/browsix-gopherjs/compiler/analysis"
+	"github.com/SamGinzburg/browsix-gopherjs/compiler/typesutil"
 )
 
 func (c *funcContext) Write(b []byte) (int, error) {
@@ -74,7 +74,7 @@ func (c *funcContext) Delayed(f func()) {
 	c.delayedOutput = c.CatchOutput(0, f)
 }
 
-func (c *funcContext) translateArgs(sig *types.Signature, argExprs []ast.Expr, ellipsis, clone bool) []string {
+func (c *funcContext) translateArgs(sig *types.Signature, argExprs []ast.Expr, ellipsis bool) []string {
 	if len(argExprs) == 1 {
 		if tuple, isTuple := c.p.TypeOf(argExprs[0]).(*types.Tuple); isTuple {
 			tupleVar := c.newVariable("_tuple")
@@ -108,13 +108,7 @@ func (c *funcContext) translateArgs(sig *types.Signature, argExprs []ast.Expr, e
 			argType = sig.Params().At(i).Type()
 		}
 
-		var arg string
-		switch {
-		case clone:
-			arg = c.translateImplicitConversionWithCloning(argExpr, argType).String()
-		default:
-			arg = c.translateImplicitConversion(argExpr, argType).String()
-		}
+		arg := c.translateImplicitConversionWithCloning(argExpr, argType).String()
 
 		if preserveOrder && c.p.Types[argExpr].Value == nil {
 			argVar := c.newVariable("_arg")
@@ -374,7 +368,14 @@ func (c *funcContext) handleEscapingVars(n ast.Node) {
 	c.p.escapingVars = newEscapingVars
 
 	var names []string
-	for obj := range analysis.EscapingObjects(n, c.p.Info.Info) {
+	objs := analysis.EscapingObjects(n, c.p.Info.Info)
+	sort.Slice(objs, func(i, j int) bool {
+		if objs[i].Name() == objs[j].Name() {
+			return objs[i].Pos() < objs[j].Pos()
+		}
+		return objs[i].Name() < objs[j].Name()
+	})
+	for _, obj := range objs {
 		names = append(names, c.objectName(obj))
 		c.p.escapingVars[obj] = true
 	}
@@ -627,7 +628,7 @@ func rangeCheck(pattern string, constantIndex, array bool) string {
 	if !constantIndex {
 		check = "(%2f < 0 || " + check + ")"
 	}
-	return "(" + check + ` ? $throwRuntimeError("index out of range") : ` + pattern + ")"
+	return "(" + check + ` ? ($throwRuntimeError("index out of range"), undefined) : ` + pattern + ")"
 }
 
 func endsWithReturn(stmts []ast.Stmt) bool {

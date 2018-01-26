@@ -5,8 +5,8 @@ import (
 	"go/token"
 	"go/types"
 
-	"github.com/bpowers/browsix-gopherjs/compiler/astutil"
-	"github.com/bpowers/browsix-gopherjs/compiler/typesutil"
+	"github.com/SamGinzburg/browsix-gopherjs/compiler/astutil"
+	"github.com/SamGinzburg/browsix-gopherjs/compiler/typesutil"
 )
 
 type continueStmt struct {

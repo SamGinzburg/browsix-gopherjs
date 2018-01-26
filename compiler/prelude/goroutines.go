@@ -111,10 +111,10 @@ var $recover = function() {
 };
 var $throw = function(err) { throw err; };
 
-var $dummyGoroutine = { asleep: false, exit: false, deferStack: [], panicStack: [], canBlock: false };
-var $curGoroutine = $dummyGoroutine, $totalGoroutines = 0, $awakeGoroutines = 0, $checkForDeadlock = true;
+var $noGoroutine = { asleep: false, exit: false, deferStack: [], panicStack: [] };
+var $curGoroutine = $noGoroutine, $totalGoroutines = 0, $awakeGoroutines = 0, $checkForDeadlock = true;
 var $mainFinished = false;
-var $go = function(fun, args, direct) {
+var $go = function(fun, args) {
   $totalGoroutines++;
   $awakeGoroutines++;
   var $goroutine = function() {
@@ -132,7 +132,7 @@ var $go = function(fun, args, direct) {
         throw err;
       }
     } finally {
-      $curGoroutine = $dummyGoroutine;
+      $curGoroutine = $noGoroutine;
       if ($goroutine.exit) { /* also set by runtime.Goexit() */
         $totalGoroutines--;
         $goroutine.asleep = true;
@@ -155,8 +155,7 @@ var $go = function(fun, args, direct) {
   $goroutine.exit = false;
   $goroutine.deferStack = [];
   $goroutine.panicStack = [];
-  $goroutine.canBlock = true;
-  $schedule($goroutine, direct);
+  $schedule($goroutine);
 };
 
 // from https://github.com/YuzuJS/setImmediate/blob/master/setImmediate.js
@@ -350,24 +349,18 @@ var $runScheduled = function() {
     while ((r = $scheduled.shift()) !== undefined) {
       r();
     }
-    $schedulerActive = false;
   } finally {
     if ($schedulerActive) {
       setImmediate($runScheduled);
     }
   }
 };
-var $schedule = function(goroutine, direct) {
+
+var $schedule = function(goroutine) {
   if (goroutine.asleep) {
     goroutine.asleep = false;
     $awakeGoroutines++;
   }
-
-  if (direct) {
-    goroutine();
-    return;
-  }
-
   $scheduled.push(goroutine);
   if (!$schedulerActive) {
     $schedulerActive = true;
@@ -384,7 +377,7 @@ var $setTimeout = function(f, t) {
 };
 
 var $block = function() {
-  if (!$curGoroutine.canBlock) {
+  if ($curGoroutine === $noGoroutine) {
     $throwRuntimeError("cannot block in JavaScript callback, fix by wrapping code in goroutine");
   }
   $curGoroutine.asleep = true;
@@ -405,14 +398,16 @@ var $send = function(chan, value) {
   }
 
   var thisGoroutine = $curGoroutine;
-  chan.$sendQueue.push(function() {
+  var closedDuringSend;
+  chan.$sendQueue.push(function(closed) {
+    closedDuringSend = closed;
     $schedule(thisGoroutine);
     return value;
   });
   $block();
   return {
     $blk: function() {
-      if (chan.$closed) {
+      if (closedDuringSend) {
         $throwRuntimeError("send on closed channel");
       }
     }
@@ -421,7 +416,7 @@ var $send = function(chan, value) {
 var $recv = function(chan) {
   var queuedSend = chan.$sendQueue.shift();
   if (queuedSend !== undefined) {
-    chan.$buffer.push(queuedSend());
+    chan.$buffer.push(queuedSend(false));
   }
   var bufferedValue = chan.$buffer.shift();
   if (bufferedValue !== undefined) {
@@ -451,7 +446,7 @@ var $close = function(chan) {
     if (queuedSend === undefined) {
       break;
     }
-    queuedSend(); /* will panic because of closed channel */
+    queuedSend(true); /* will panic */
   }
   while (true) {
     var queuedRecv = chan.$recvQueue.shift();

@@ -5,10 +5,11 @@ package js_test
 import (
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
-	"github.com/bpowers/browsix-gopherjs/js"
+	"github.com/SamGinzburg/browsix-gopherjs/js"
 )
 
 var dummys = js.Global.Call("eval", `({
@@ -41,6 +42,9 @@ var dummys = js.Global.Call("eval", `({
 	},
 	call: function(f, a) {
 		f(a);
+	},
+	return: function(x) {
+		return x;
 	},
 })`)
 
@@ -287,7 +291,7 @@ func TestDate(t *testing.T) {
 	}
 }
 
-// https://github.com/bpowers/browsix-gopherjs/issues/287
+// https://github.com/SamGinzburg/browsix-gopherjs/issues/287
 func TestInternalizeDate(t *testing.T) {
 	var a = time.Unix(0, (123 * time.Millisecond).Nanoseconds())
 	var b time.Time
@@ -376,7 +380,7 @@ func TestError(t *testing.T) {
 			t.Fail()
 		}
 		jsErr, ok := err.(*js.Error)
-		if !ok || jsErr.Get("stack") == js.Undefined {
+		if !ok || !strings.Contains(jsErr.Error(), "throwsError") {
 			t.Fail()
 		}
 	}()
@@ -398,15 +402,21 @@ func TestExternalizeField(t *testing.T) {
 
 func TestMakeFunc(t *testing.T) {
 	o := js.Global.Get("Object").New()
-	o.Set("f", js.MakeFunc(func(this *js.Object, arguments []*js.Object) interface{} {
-		if this != o {
-			t.Fail()
+	for i := 3; i < 5; i++ {
+		x := i
+		if i == 4 {
+			break
 		}
-		if len(arguments) != 2 || arguments[0].Int() != 1 || arguments[1].Int() != 2 {
-			t.Fail()
-		}
-		return 3
-	}))
+		o.Set("f", js.MakeFunc(func(this *js.Object, arguments []*js.Object) interface{} {
+			if this != o {
+				t.Fail()
+			}
+			if len(arguments) != 2 || arguments[0].Int() != 1 || arguments[1].Int() != 2 {
+				t.Fail()
+			}
+			return x
+		}))
+	}
 	if o.Call("f", 1, 2).Int() != 3 {
 		t.Fail()
 	}
@@ -549,5 +559,41 @@ func TestSurrogatePairs(t *testing.T) {
 	}
 	if str.String() != "\U0001F600" {
 		t.Fail()
+	}
+}
+
+func TestUint8Array(t *testing.T) {
+	uint8Array := js.Global.Get("Uint8Array")
+	if dummys.Call("return", []byte{}).Get("constructor") != uint8Array {
+		t.Errorf("Empty byte array is not externalized as a Uint8Array")
+	}
+	if dummys.Call("return", []byte{0x01}).Get("constructor") != uint8Array {
+		t.Errorf("Non-empty byte array is not externalized as a Uint8Array")
+	}
+}
+
+func TestTypeSwitchJSObject(t *testing.T) {
+	obj := js.Global.Get("Object").New()
+	obj.Set("foo", "bar")
+
+	want := "bar"
+
+	if got := obj.Get("foo").String(); got != want {
+		t.Errorf("Direct access to *js.Object field gave %q, want %q", got, want)
+	}
+
+	var x interface{} = obj
+
+	switch x := x.(type) {
+	case *js.Object:
+		if got := x.Get("foo").String(); got != want {
+			t.Errorf("Value passed through interface and type switch gave %q, want %q", got, want)
+		}
+	}
+
+	if y, ok := x.(*js.Object); ok {
+		if got := y.Get("foo").String(); got != want {
+			t.Errorf("Value passed through interface and type assert gave %q, want %q", got, want)
+		}
 	}
 }

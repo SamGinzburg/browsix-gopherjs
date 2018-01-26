@@ -11,9 +11,10 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/bpowers/browsix-gopherjs/compiler/analysis"
-	"github.com/bpowers/browsix-gopherjs/third_party/importer"
+	"github.com/SamGinzburg/browsix-gopherjs/compiler/analysis"
+
 	"github.com/neelance/astrewrite"
+	"golang.org/x/tools/go/gcimporter15"
 	"golang.org/x/tools/go/types/typeutil"
 )
 
@@ -110,7 +111,7 @@ func (pi packageImporter) Import(path string) (*types.Package, error) {
 	a, err := pi.importContext.Import(path)
 	if err != nil {
 		if *pi.importError == nil {
-			// If import failed, show first error of import only (https://github.com/bpowers/browsix-gopherjs/issues/119).
+			// If import failed, show first error of import only (https://github.com/SamGinzburg/browsix-gopherjs/issues/119).
 			*pi.importError = err
 		}
 		return nil, err
@@ -165,7 +166,7 @@ func Compile(importPath string, files []*ast.File, fileSet *token.FileSet, impor
 	}
 	importContext.Packages[importPath] = typesPkg
 
-	exportData := importer.ExportData(typesPkg)
+	exportData := gcimporter.BExportData(nil, typesPkg)
 	encodedFileSet := bytes.NewBuffer(nil)
 	if err := fileSet.Write(json.NewEncoder(encodedFileSet).Encode); err != nil {
 		return nil, err
@@ -218,6 +219,11 @@ func Compile(importPath string, files []*ast.File, fileSet *token.FileSet, impor
 	var importDecls []*Decl
 	var importedPaths []string
 	for _, importedPkg := range typesPkg.Imports() {
+		if importedPkg == types.Unsafe {
+			// Prior to Go 1.9, unsafe import was excluded by Imports() method,
+			// but now we do it here to maintain previous behavior.
+			continue
+		}
 		c.p.pkgVars[importedPkg.Path()] = c.newVariableWithLevel(importedPkg.Name(), true)
 		importedPaths = append(importedPaths, importedPkg.Path())
 	}
@@ -429,6 +435,9 @@ func Compile(importPath string, files []*ast.File, fileSet *token.FileSet, impor
 	// named types
 	var typeDecls []*Decl
 	for _, o := range c.p.typeNames {
+		if o.IsAlias() {
+			continue
+		}
 		typeName := c.objectName(o)
 		d := Decl{
 			Vars:            []string{typeName},
@@ -461,37 +470,38 @@ func Compile(importPath string, files []*ast.File, fileSet *token.FileSet, impor
 				case *types.Basic, *types.Array, *types.Slice, *types.Chan, *types.Signature, *types.Interface, *types.Pointer, *types.Map:
 					size = sizes32.Sizeof(t)
 				}
-				c.Printf(`%s = $newType(%d, %s, "%s.%s", "%s", "%s", %s);`, lhs, size, typeKind(o.Type()), o.Pkg().Name(), o.Name(), o.Name(), o.Pkg().Path(), constructor)
+				c.Printf(`%s = $newType(%d, %s, "%s.%s", %t, "%s", %t, %s);`, lhs, size, typeKind(o.Type()), o.Pkg().Name(), o.Name(), o.Name() != "", o.Pkg().Path(), o.Exported(), constructor)
 			})
 			d.MethodListCode = c.CatchOutput(0, func() {
-				if _, isInterface := o.Type().Underlying().(*types.Interface); !isInterface {
-					named := o.Type().(*types.Named)
-					var methods []string
-					var ptrMethods []string
-					for i := 0; i < named.NumMethods(); i++ {
-						method := named.Method(i)
-						name := method.Name()
-						if reservedKeywords[name] {
-							name += "$"
-						}
-						pkgPath := ""
-						if !method.Exported() {
-							pkgPath = method.Pkg().Path()
-						}
-						t := method.Type().(*types.Signature)
-						entry := fmt.Sprintf(`{prop: "%s", name: "%s", pkg: "%s", typ: $funcType(%s)}`, name, method.Name(), pkgPath, c.initArgs(t))
-						if _, isPtr := t.Recv().Type().(*types.Pointer); isPtr {
-							ptrMethods = append(ptrMethods, entry)
-							continue
-						}
-						methods = append(methods, entry)
+				named := o.Type().(*types.Named)
+				if _, ok := named.Underlying().(*types.Interface); ok {
+					return
+				}
+				var methods []string
+				var ptrMethods []string
+				for i := 0; i < named.NumMethods(); i++ {
+					method := named.Method(i)
+					name := method.Name()
+					if reservedKeywords[name] {
+						name += "$"
 					}
-					if len(methods) > 0 {
-						c.Printf("%s.methods = [%s];", c.typeName(o.Type()), strings.Join(methods, ", "))
+					pkgPath := ""
+					if !method.Exported() {
+						pkgPath = method.Pkg().Path()
 					}
-					if len(ptrMethods) > 0 {
-						c.Printf("%s.methods = [%s];", c.typeName(types.NewPointer(o.Type())), strings.Join(ptrMethods, ", "))
+					t := method.Type().(*types.Signature)
+					entry := fmt.Sprintf(`{prop: "%s", name: "%s", pkg: "%s", typ: $funcType(%s)}`, name, method.Name(), pkgPath, c.initArgs(t))
+					if _, isPtr := t.Recv().Type().(*types.Pointer); isPtr {
+						ptrMethods = append(ptrMethods, entry)
+						continue
 					}
+					methods = append(methods, entry)
+				}
+				if len(methods) > 0 {
+					c.Printf("%s.methods = [%s];", c.typeName(named), strings.Join(methods, ", "))
+				}
+				if len(ptrMethods) > 0 {
+					c.Printf("%s.methods = [%s];", c.typeName(types.NewPointer(named)), strings.Join(ptrMethods, ", "))
 				}
 			})
 			switch t := o.Type().Underlying().(type) {
@@ -574,20 +584,16 @@ func (c *funcContext) initArgs(ty types.Type) string {
 		}
 		return fmt.Sprintf("[%s], [%s], %t", strings.Join(params, ", "), strings.Join(results, ", "), t.Variadic())
 	case *types.Struct:
+		pkgPath := ""
 		fields := make([]string, t.NumFields())
 		for i := range fields {
 			field := t.Field(i)
-			name := ""
-			if !field.Anonymous() {
-				name = field.Name()
-			}
-			pkgPath := ""
 			if !field.Exported() {
 				pkgPath = field.Pkg().Path()
 			}
-			fields[i] = fmt.Sprintf(`{prop: "%s", name: "%s", pkg: "%s", typ: %s, tag: %s}`, fieldName(t, i), name, pkgPath, c.typeName(field.Type()), encodeString(t.Tag(i)))
+			fields[i] = fmt.Sprintf(`{prop: "%s", name: "%s", anonymous: %t, exported: %t, typ: %s, tag: %s}`, fieldName(t, i), field.Name(), field.Anonymous(), field.Exported(), c.typeName(field.Type()), encodeString(t.Tag(i)))
 		}
-		return fmt.Sprintf("[%s]", strings.Join(fields, ", "))
+		return fmt.Sprintf(`"%s", [%s]`, pkgPath, strings.Join(fields, ", "))
 	default:
 		panic("invalid type")
 	}
@@ -607,17 +613,7 @@ func (c *funcContext) translateToplevelFunction(fun *ast.FuncDecl, info *analysi
 			return []byte(fmt.Sprintf("\t%s = function() {\n\t\t$throwRuntimeError(\"native function not implemented: %s\");\n\t};\n", funcRef, o.FullName()))
 		}
 
-		var initStmts []ast.Stmt
-		if recv != nil && !isBlank(recv) {
-			initStmts = append([]ast.Stmt{
-				&ast.AssignStmt{
-					Lhs: []ast.Expr{recv},
-					Tok: token.DEFINE,
-					Rhs: []ast.Expr{c.setType(&this{}, sig.Recv().Type())},
-				},
-			}, initStmts...)
-		}
-		params, fun := translateFunction(fun.Type, initStmts, fun.Body, c, sig, info, funcRef)
+		params, fun := translateFunction(fun.Type, recv, fun.Body, c, sig, info, funcRef)
 		joinedParams = strings.Join(params, ", ")
 		return []byte(fmt.Sprintf("\t%s = %s;\n", funcRef, fun))
 	}
@@ -669,7 +665,7 @@ func (c *funcContext) translateToplevelFunction(fun *ast.FuncDecl, info *analysi
 	return code.Bytes()
 }
 
-func translateFunction(typ *ast.FuncType, initStmts []ast.Stmt, body *ast.BlockStmt, outerContext *funcContext, sig *types.Signature, info *analysis.FuncInfo, funcRef string) ([]string, string) {
+func translateFunction(typ *ast.FuncType, recv *ast.Ident, body *ast.BlockStmt, outerContext *funcContext, sig *types.Signature, info *analysis.FuncInfo, funcRef string) ([]string, string) {
 	if info == nil {
 		panic("nil info")
 	}
@@ -680,7 +676,7 @@ func translateFunction(typ *ast.FuncType, initStmts []ast.Stmt, body *ast.BlockS
 		parent:      outerContext,
 		sig:         sig,
 		allVars:     make(map[string]int, len(outerContext.allVars)),
-		localVars:   []string{"$ptr"},
+		localVars:   []string{},
 		flowDatas:   map[*types.Label]*flowData{nil: {}},
 		caseCounter: 1,
 		labelCases:  make(map[*types.Label]int),
@@ -702,17 +698,6 @@ func translateFunction(typ *ast.FuncType, initStmts []ast.Stmt, body *ast.BlockS
 				continue
 			}
 			params = append(params, c.objectName(c.p.Defs[ident]))
-
-			switch c.p.Defs[ident].Type().Underlying().(type) {
-			case *types.Array, *types.Struct:
-				initStmts = append([]ast.Stmt{
-					&ast.AssignStmt{
-						Lhs: []ast.Expr{ident},
-						Tok: token.DEFINE,
-						Rhs: []ast.Expr{ident},
-					},
-				}, initStmts...)
-			}
 		}
 	}
 
@@ -733,8 +718,18 @@ func translateFunction(typ *ast.FuncType, initStmts []ast.Stmt, body *ast.BlockS
 			}
 		}
 
-		c.translateStmtList(initStmts)
+		if recv != nil && !isBlank(recv) {
+			this := "this"
+			if isWrapped(c.p.TypeOf(recv)) {
+				this = "this.$val"
+			}
+			c.Printf("%s = %s;", c.translateExpr(recv), this)
+		}
+
 		c.translateStmtList(body.List)
+		if len(c.Flattened) != 0 && !endsWithReturn(body.List) {
+			c.translateStmt(&ast.ReturnStmt{}, nil)
+		}
 	}))
 
 	sort.Strings(c.localVars)
@@ -791,9 +786,6 @@ func translateFunction(typ *ast.FuncType, initStmts []ast.Stmt, body *ast.BlockS
 	if len(c.Flattened) != 0 {
 		prefix = prefix + " s: while (true) { switch ($s) { case 0:"
 		suffix = " } return; }" + suffix
-		if !endsWithReturn(body.List) {
-			suffix = " $s = -1; case -1:" + suffix
-		}
 	}
 
 	if c.HasDefer {

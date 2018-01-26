@@ -29,8 +29,8 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	gbuild "github.com/bpowers/browsix-gopherjs/build"
-	"github.com/bpowers/browsix-gopherjs/compiler"
+	gbuild "github.com/SamGinzburg/browsix-gopherjs/build"
+	"github.com/SamGinzburg/browsix-gopherjs/compiler"
 	"github.com/kisielk/gotool"
 	"github.com/neelance/sourcemap"
 	"github.com/spf13/cobra"
@@ -589,7 +589,7 @@ func (fs serveCommandFileSystem) Open(requestName string) (http.File, error) {
 
 				sourceMapFilter := &compiler.SourceMapFilter{Writer: buf}
 				m := &sourcemap.Map{File: base + ".js"}
-				sourceMapFilter.MappingCallback = gbuild.NewMappingCallback(m, fs.options.GOROOT, fs.options.GOPATH)
+				sourceMapFilter.MappingCallback = gbuild.NewMappingCallback(m, fs.options.GOROOT, fs.options.GOPATH, true)
 
 				deps, err := compiler.ImportDependencies(archive, s.BuildImportPath)
 				if err != nil {

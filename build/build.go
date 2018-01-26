@@ -256,7 +256,7 @@ func parseAndAugment(pkg *build.Package, isTest bool, fileSet *token.FileSet) ([
 		},
 	}
 
-	if nativesPkg, err := Import("github.com/SamGinzburg/browsix-gopherjs/compiler/natives/"+importPath, 0, "", nil); err == nil {
+	if nativesPkg, err := Import(importPath, 0, "", nil); err == nil {
 		names := nativesPkg.GoFiles
 		if isTest {
 			names = append(names, nativesPkg.TestGoFiles...)

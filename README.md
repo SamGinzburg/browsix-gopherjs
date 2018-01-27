@@ -66,7 +66,7 @@ If you include an argument, it will be the root from which everything is served.
 ### Getting started
 
 #### Interacting with the DOM
-The package `github.com/gopherjs/gopherjs/js` (see [documentation](https://godoc.org/github.com/gopherjs/gopherjs/js)) provides functions for interacting with native JavaScript APIs. For example the line
+The package `github.com/SamGinzburg/browsix-gopherjs/js` (see [documentation](https://godoc.org/github.com/SamGinzburg/browsix-gopherjs/js)) provides functions for interacting with native JavaScript APIs. For example the line
 
 ```js
 document.write("Hello world!");
@@ -86,7 +86,7 @@ Set a global variable to a map that contains the functions:
 ```go
 package main
 
-import "github.com/gopherjs/gopherjs/js"
+import "github.com/SamGinzburg/browsix-gopherjs/js"
 
 func main() {
 	js.Global.Set("pet", map[string]interface{}{

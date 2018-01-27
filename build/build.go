@@ -97,8 +97,8 @@ func importWithSrcDir(path string, srcDir string, mode build.ImportMode, install
 	}
 
 	// TODO: Resolve issue #415 and remove this temporary workaround.
-	if strings.HasSuffix(pkg.ImportPath, "/vendor/github.com/gopherjs/gopherjs/js") {
-		return nil, fmt.Errorf("vendoring github.com/gopherjs/gopherjs/js package is not supported, see https://github.com/gopherjs/gopherjs/issues/415")
+	if strings.HasSuffix(pkg.ImportPath, "/vendor/github.com/SamGinzburg/browsix-gopherjs/js") {
+		return nil, fmt.Errorf("vendoring github.com/SamGinzburg/browsix-gopherjs/js package is not supported, see https://github.com/gopherjs/gopherjs/issues/415")
 	}
 
 	switch path {
@@ -256,8 +256,7 @@ func parseAndAugment(pkg *build.Package, isTest bool, fileSet *token.FileSet) ([
 		},
 	}
 
-	_ = nativesContext
-	if nativesPkg, err := Import("github.com/SamGinzburg/browsix-gopherjs/compiler/natives/"+importPath, 0, "", nil); err == nil {
+	if nativesPkg, err := nativesContext.Import("github.com/SamGinzburg/browsix-gopherjs/compiler/natives/"+importPath, "", 0); err == nil {
 		names := nativesPkg.GoFiles
 		if isTest {
 			names = append(names, nativesPkg.TestGoFiles...)
@@ -266,10 +265,16 @@ func parseAndAugment(pkg *build.Package, isTest bool, fileSet *token.FileSet) ([
 			names = nativesPkg.XTestGoFiles
 		}
 		for _, name := range names {
-			file, err := parser.ParseFile(fileSet, filepath.Join(nativesPkg.Dir, name), nil, parser.ParseComments)
+			fullPath := path.Join(nativesPkg.Dir, name)
+			r, err := nativesContext.OpenFile(fullPath)
 			if err != nil {
 				panic(err)
 			}
+			file, err := parser.ParseFile(fileSet, fullPath, r, parser.ParseComments)
+			if err != nil {
+				panic(err)
+			}
+			r.Close()
 			for _, decl := range file.Decls {
 				switch d := decl.(type) {
 				case *ast.FuncDecl:

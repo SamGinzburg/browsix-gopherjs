@@ -23,7 +23,7 @@ test:
       ulimit -s 10000 && gopherjs test --minify -v --short
       github.com/gopherjs/gopherjs/tests
       github.com/gopherjs/gopherjs/tests/main
-      github.com/gopherjs/gopherjs/js
+      github.com/SamGinzburg/browsix-gopherjs/js
       archive/tar
       archive/zip
       bufio

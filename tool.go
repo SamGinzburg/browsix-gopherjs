@@ -100,7 +100,6 @@ func main() {
 		options.BuildTags = strings.Fields(tags)
 		for {
 			s := gbuild.NewSession(options)
-
 			err := func() error {
 				// Handle "gopherjs build [files]" ad-hoc package mode.
 				if len(args) > 0 && (strings.HasSuffix(args[0], ".go") || strings.HasSuffix(args[0], ".inc.js")) {
@@ -138,6 +137,7 @@ func main() {
 						s.Watcher.Add(pkg.Dir)
 					}
 					pkg, err := gbuild.Import("github.com/SamGinzburg/browsix-gopherjs/compiler/natives/"+pkgPath, 0, s.InstallSuffix(), options.BuildTags)
+
 					if err != nil {
 						return err
 					}

@@ -102,11 +102,8 @@ func main() {
 			s := gbuild.NewSession(options)
 
 			err := func() error {
-				if len(args) == 0 {
-					return s.BuildDir(currentDirectory, currentDirectory, pkgObj)
-				}
-
-				if strings.HasSuffix(args[0], ".go") || strings.HasSuffix(args[0], ".inc.js") {
+				// Handle "gopherjs build [files]" ad-hoc package mode.
+				if len(args) > 0 && (strings.HasSuffix(args[0], ".go") || strings.HasSuffix(args[0], ".inc.js")) {
 					for _, arg := range args {
 						if !strings.HasSuffix(arg, ".go") && !strings.HasSuffix(arg, ".inc.js") {
 							return fmt.Errorf("named files must be .go or .inc.js files")
@@ -124,18 +121,23 @@ func main() {
 							s.Watcher.Add(name)
 						}
 					}
-					if err := s.BuildFiles(args, pkgObj, currentDirectory); err != nil {
-						return err
-					}
-					return nil
+					err := s.BuildFiles(args, pkgObj, currentDirectory)
+					return err
 				}
 
-				for _, pkgPath := range args {
-					pkgPath = filepath.ToSlash(pkgPath)
+				// Expand import path patterns.
+				patternContext := gbuild.NewBuildContext("", options.BuildTags)
+				pkgs := (&gotool.Context{BuildContext: *patternContext}).ImportPaths(args)
+
+				for _, pkgPath := range pkgs {
 					if s.Watcher != nil {
-						s.Watcher.Add(pkgPath)
+						pkg, err := gbuild.NewBuildContext(s.InstallSuffix(), options.BuildTags).Import(pkgPath, "", build.FindOnly)
+						if err != nil {
+							return err
+						}
+						s.Watcher.Add(pkg.Dir)
 					}
-					pkg, err := gbuild.Import(pkgPath, 0, s.InstallSuffix(), options.BuildTags)
+					pkg, err := gbuild.Import("github.com/SamGinzburg/browsix-gopherjs/compiler/natives/"+pkgPath, 0, s.InstallSuffix(), options.BuildTags)
 					if err != nil {
 						return err
 					}
@@ -143,12 +145,14 @@ func main() {
 					if err != nil {
 						return err
 					}
-					if pkgObj == "" {
-						pkgObj = filepath.Base(args[0]) + ".js"
-					}
-					if pkg.IsCommand() && !pkg.UpToDate {
-						if err := s.WriteCommandPackage(archive, pkgObj); err != nil {
-							return err
+					if len(pkgs) == 1 { // Only consider writing output if single package specified.
+						if pkgObj == "" {
+							pkgObj = filepath.Base(pkg.Dir) + ".js"
+						}
+						if pkg.IsCommand() && !pkg.UpToDate {
+							if err := s.WriteCommandPackage(archive, pkgObj); err != nil {
+								return err
+							}
 						}
 					}
 				}

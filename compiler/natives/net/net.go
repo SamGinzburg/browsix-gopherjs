@@ -18,7 +18,7 @@ func runtime_pollOpen(fd uintptr) (uintptr, int) {
 
 func runtime_pollClose(ctx uintptr) {
 }
-A
+
 func runtime_pollWait(ctx uintptr, mode int) int {
 	return 0
 }

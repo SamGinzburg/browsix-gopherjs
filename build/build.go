@@ -266,7 +266,6 @@ func parseAndAugment(pkg *build.Package, isTest bool, fileSet *token.FileSet) ([
 			names = nativesPkg.XTestGoFiles
 		}
 		for _, name := range names {
-			fmt.Printf(name + "\n")
 			file, err := parser.ParseFile(fileSet, filepath.Join(nativesPkg.Dir, name), nil, parser.ParseComments)
 			if err != nil {
 				panic(err)

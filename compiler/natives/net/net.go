@@ -6,7 +6,7 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/bpowers/browsix-gopherjs/js"
+	"github.com/SamGinzburg/browsix-gopherjs/js"
 )
 
 func runtime_pollServerInit() {
@@ -18,7 +18,7 @@ func runtime_pollOpen(fd uintptr) (uintptr, int) {
 
 func runtime_pollClose(ctx uintptr) {
 }
-
+A
 func runtime_pollWait(ctx uintptr, mode int) int {
 	return 0
 }

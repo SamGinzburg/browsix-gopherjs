@@ -121,6 +121,7 @@ func main() {
 						}
 					}
 					err := s.BuildFiles(args, pkgObj, currentDirectory)
+
 					return err
 				}
 

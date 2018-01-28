@@ -6,7 +6,7 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/SamGinzburg/browsix-gopherjs/js"
+	"github.com/bpowers/browsix-gopherjs/js"
 )
 
 func runtime_pollServerInit() {
@@ -101,7 +101,7 @@ func (d *Dialer) Dial(network, address string) (Conn, error) {
 		return nil, err
 	}
 
-	if err := fd.dial(nil, raddr, noDeadline, noCancel); err != nil {
+	if err := fd.dial(nil, raddr, nil); err != nil {
 		fd.Close()
 		return nil, err
 	}

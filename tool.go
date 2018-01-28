@@ -137,8 +137,7 @@ func main() {
 						}
 						s.Watcher.Add(pkg.Dir)
 					}
-					pkg, err := gbuild.Import("github.com/SamGinzburg/browsix-gopherjs/compiler/natives/"+pkgPath, 0, s.InstallSuffix(), options.BuildTags)
-
+					pkg, err := gbuild.Import(pkgPath, 0, s.InstallSuffix(), options.BuildTags)
 					if err != nil {
 						return err
 					}
@@ -146,6 +145,7 @@ func main() {
 					if err != nil {
 						return err
 					}
+
 					if len(pkgs) == 1 { // Only consider writing output if single package specified.
 						if pkgObj == "" {
 							pkgObj = filepath.Base(pkg.Dir) + ".js"

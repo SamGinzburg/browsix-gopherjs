@@ -8,7 +8,6 @@ import (
 	"go/scanner"
 	"go/token"
 	"go/types"
-	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -22,8 +21,6 @@ import (
 	"github.com/fsnotify/fsnotify"
 
 	"github.com/SamGinzburg/browsix-gopherjs/compiler"
-	"github.com/SamGinzburg/browsix-gopherjs/compiler/natives"
-
 	"github.com/neelance/sourcemap"
 )
 
@@ -228,32 +225,6 @@ func parseAndAugment(pkg *build.Package, isTest bool, fileSet *token.FileSet) ([
 			return strings.Split(list, "/")
 		},
 		IsAbsPath: path.IsAbs,
-		IsDir: func(name string) bool {
-			dir, err := natives.FS.Open(name)
-			if err != nil {
-				return false
-			}
-			defer dir.Close()
-			info, err := dir.Stat()
-			if err != nil {
-				return false
-			}
-			return info.IsDir()
-		},
-		HasSubdir: func(root, name string) (rel string, ok bool) {
-			panic("not implemented")
-		},
-		ReadDir: func(name string) (fi []os.FileInfo, err error) {
-			dir, err := natives.FS.Open(name)
-			if err != nil {
-				return nil, err
-			}
-			defer dir.Close()
-			return dir.Readdir(0)
-		},
-		OpenFile: func(name string) (r io.ReadCloser, err error) {
-			return natives.FS.Open(name)
-		},
 	}
 
 	_ = nativesContext
@@ -292,6 +263,7 @@ func parseAndAugment(pkg *build.Package, isTest bool, fileSet *token.FileSet) ([
 			files = append(files, file)
 		}
 	}
+
 	delete(replacedDeclNames, "init")
 
 	var errList compiler.ErrorList
@@ -303,6 +275,7 @@ func parseAndAugment(pkg *build.Package, isTest bool, fileSet *token.FileSet) ([
 		if err != nil {
 			return nil, err
 		}
+
 		file, err := parser.ParseFile(fileSet, name, r, parser.ParseComments)
 		r.Close()
 		if err != nil {
@@ -528,7 +501,6 @@ func (s *Session) BuildPackage(pkg *PackageData) (*compiler.Archive, error) {
 	if archive, ok := s.Archives[pkg.ImportPath]; ok {
 		return archive, nil
 	}
-
 	if pkg.PkgObj != "" {
 		var fileInfo os.FileInfo
 		gopherjsBinary, err := os.Executable()
@@ -628,6 +600,7 @@ func (s *Session) BuildPackage(pkg *PackageData) (*compiler.Archive, error) {
 			return archive, nil
 		},
 	}
+
 	archive, err := compiler.Compile(pkg.ImportPath, files, fileSet, importContext, s.options.Minify)
 	if err != nil {
 		return nil, err
@@ -648,7 +621,6 @@ func (s *Session) BuildPackage(pkg *PackageData) (*compiler.Archive, error) {
 	}
 
 	s.Archives[pkg.ImportPath] = archive
-
 	if pkg.PkgObj == "" || pkg.IsCommand() {
 		return archive, nil
 	}

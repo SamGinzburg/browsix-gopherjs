@@ -4,11 +4,6 @@
 
 package signal
 
-import (
-//	"os"
-//	"syscall"
-)
-
 var sigch = make(chan uint32)
 
 // Defined by the runtime package.

@@ -5,6 +5,8 @@ package prelude
 const syscalls = `
 (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
 'use strict';
+Object.defineProperty(exports, "__esModule", { value: true });
+var AF;
 (function (AF) {
     AF[AF["UNSPEC"] = 0] = "UNSPEC";
     AF[AF["LOCAL"] = 1] = "LOCAL";
@@ -12,14 +14,13 @@ const syscalls = `
     AF[AF["FILE"] = 1] = "FILE";
     AF[AF["INET"] = 2] = "INET";
     AF[AF["INET6"] = 10] = "INET6";
-})(exports.AF || (exports.AF = {}));
-var AF = exports.AF;
-;
+})(AF = exports.AF || (exports.AF = {}));
+var SOCK;
 (function (SOCK) {
     SOCK[SOCK["STREAM"] = 1] = "STREAM";
     SOCK[SOCK["DGRAM"] = 2] = "DGRAM";
-})(exports.SOCK || (exports.SOCK = {}));
-var SOCK = exports.SOCK;
+})(SOCK = exports.SOCK || (exports.SOCK = {}));
+var ErrorCode;
 (function (ErrorCode) {
     ErrorCode[ErrorCode["EPERM"] = 0] = "EPERM";
     ErrorCode[ErrorCode["ENOENT"] = 1] = "ENOENT";
@@ -36,8 +37,7 @@ var SOCK = exports.SOCK;
     ErrorCode[ErrorCode["EROFS"] = 12] = "EROFS";
     ErrorCode[ErrorCode["ENOTEMPTY"] = 13] = "ENOTEMPTY";
     ErrorCode[ErrorCode["ENOTSUP"] = 14] = "ENOTSUP";
-})(exports.ErrorCode || (exports.ErrorCode = {}));
-var ErrorCode = exports.ErrorCode;
+})(ErrorCode = exports.ErrorCode || (exports.ErrorCode = {}));
 var fsErrors = {
     EPERM: 'Operation not permitted.',
     ENOENT: 'No such file or directory.',
@@ -112,7 +112,7 @@ var USyscalls = (function () {
         this.outstanding[msgId] = function () {
             var args = [];
             for (var _i = 0; _i < arguments.length; _i++) {
-                args[_i - 0] = arguments[_i];
+                args[_i] = arguments[_i];
             }
             console.log('received callback for exit(), should clean up');
         };
@@ -167,6 +167,11 @@ var USyscalls = (function () {
         var msgId = this.nextMsgId();
         this.outstanding[msgId] = cb;
         this.post(msgId, 'connect', fd, addr);
+    };
+    USyscalls.prototype.fcntl = function (cmd, arg, cb) {
+        var msgId = this.nextMsgId();
+        this.outstanding[msgId] = cb;
+        this.post(msgId, 'fcntl', cmd, arg);
     };
     USyscalls.prototype.getcwd = function (cb) {
         var msgId = this.nextMsgId();
@@ -362,18 +367,23 @@ exports.syscall = new USyscalls(getGlobal());
 
 },{}],2:[function(require,module,exports){
 'use strict';
-var __extends = (this && this.__extends) || function (d, b) {
-    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
-    function __() { this.constructor = d; }
-    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-};
-var syscall_1 = require('../browser-node/syscall');
-var table_1 = require('./table');
+var __extends = (this && this.__extends) || (function () {
+    var extendStatics = Object.setPrototypeOf ||
+        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+    return function (d, b) {
+        extendStatics(d, b);
+        function __() { this.constructor = d; }
+        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
+var syscall_1 = require("../browser-node/syscall");
+var table_1 = require("./table");
 function Syscall(cb, trap) {
     table_1.syscallTbl[trap].apply(this, arguments);
 }
 exports.Syscall = Syscall;
-;
 exports.Syscall6 = Syscall;
 exports.internal = syscall_1.syscall;
 var OnceEmitter = (function () {
@@ -406,9 +416,10 @@ var OnceEmitter = (function () {
 var Process = (function (_super) {
     __extends(Process, _super);
     function Process(argv, environ) {
-        _super.call(this);
-        this.argv = argv;
-        this.env = environ;
+        var _this = _super.call(this) || this;
+        _this.argv = argv;
+        _this.env = environ;
+        return _this;
     }
     Process.prototype.exit = function (code) {
         if (code === void 0) { code = 0; }
@@ -445,11 +456,12 @@ else {
 
 },{"../browser-node/syscall":1,"./table":3}],3:[function(require,module,exports){
 'use strict';
-var syscall_1 = require('../browser-node/syscall');
+Object.defineProperty(exports, "__esModule", { value: true });
+var syscall_1 = require("./../browser-node/syscall");
 var ENOSYS = 38;
 var AT_FDCWD = -0x64;
 function sys_ni_syscall(cb, trap) {
-    console.log('ni syscall ' + trap);
+    console.log('TEST ni syscall ' + trap);
     debugger;
     setTimeout(cb, 0, [-1, 0, -ENOSYS]);
 }
@@ -502,6 +514,12 @@ function sys_pipe2(cb, trap, fds, flags) {
         cb([err ? err : 0, 0, err ? err : 0]);
     };
     syscall_1.syscall.pipe2(flags, done);
+}
+function sys_fcntl(cb, trap, cmd, arg) {
+    var done = function (err) {
+        cb(err);
+    };
+    syscall_1.syscall.fcntl(cmd, arg, done);
 }
 function sys_getcwd(cb, trap, path, len) {
     var done = function (p) {
@@ -753,7 +771,7 @@ exports.syscallTbl = [
     sys_ni_syscall,
     sys_ni_syscall,
     sys_ni_syscall,
-    sys_ni_syscall,
+    sys_fcntl,
     sys_ni_syscall,
     sys_ni_syscall,
     sys_ni_syscall,
@@ -1010,5 +1028,5 @@ exports.syscallTbl = [
     sys_spawn,
 ];
 
-},{"../browser-node/syscall":1}]},{},[2]);
+},{"./../browser-node/syscall":1}]},{},[2]);
 `

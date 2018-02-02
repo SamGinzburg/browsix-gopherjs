@@ -74,6 +74,13 @@ func Import(path string, mode build.ImportMode, installSuffix string, buildTags 
 func importWithSrcDir(path string, srcDir string, mode build.ImportMode, installSuffix string, buildTags []string) (*PackageData, error) {
 	bctx := NewBuildContext(installSuffix, buildTags)
 	switch path {
+	case "golang.org/x/sys/unix":
+		// we need to do the same thing as syscall
+		bctx.GOARCH = runtime.GOARCH
+		bctx.InstallSuffix = "js"
+		if installSuffix != "" {
+			bctx.InstallSuffix += "_" + installSuffix
+		}
 	case "syscall":
 		// syscall needs to use a typical GOARCH like amd64 to pick up definitions for _Socklen, BpfInsn, IFNAMSIZ, Timeval, BpfStat, SYS_FCNTL, Flock_t, etc.
 		bctx.GOARCH = runtime.GOARCH

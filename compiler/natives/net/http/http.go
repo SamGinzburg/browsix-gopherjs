@@ -16,7 +16,7 @@ import (
 var DefaultTransport = func() RoundTripper {
 	switch {
 	case js.Global.Get("fetch") != js.Undefined && js.Global.Get("ReadableStream") != js.Undefined: // ReadableStream is used as a check for support of streaming response bodies, see https://fetch.spec.whatwg.org/#streams.
-		return &fetchTransport{}
+		return &Transport{}
 	case js.Global.Get("XMLHttpRequest") != js.Undefined:
 		return &XHRTransport{}
 	default:

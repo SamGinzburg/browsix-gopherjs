@@ -13,7 +13,6 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -42,7 +41,7 @@ func NewBuildContext(installSuffix string, buildTags []string) *build.Context {
 		Compiler:      "gc",
 		BuildTags:     append(buildTags, "netgo"),
 		ReleaseTags:   build.Default.ReleaseTags,
-		CgoEnabled:    true, // detect `import "C"` to throw proper error
+		CgoEnabled:    false, // detect `import "C"` to throw proper error
 	}
 }
 
@@ -76,14 +75,17 @@ func importWithSrcDir(path string, srcDir string, mode build.ImportMode, install
 	switch path {
 	case "golang.org/x/sys/unix":
 		// we need to do the same thing as syscall
-		bctx.GOARCH = runtime.GOARCH
+		bctx.CgoEnabled = false
+		bctx.GOARCH = "amd64"
 		bctx.InstallSuffix = "js"
 		if installSuffix != "" {
 			bctx.InstallSuffix += "_" + installSuffix
 		}
 	case "syscall":
 		// syscall needs to use a typical GOARCH like amd64 to pick up definitions for _Socklen, BpfInsn, IFNAMSIZ, Timeval, BpfStat, SYS_FCNTL, Flock_t, etc.
-		bctx.GOARCH = runtime.GOARCH
+		bctx.CgoEnabled = false
+		bctx.GOOS = "linux"
+		bctx.GOARCH = "amd64"
 		bctx.InstallSuffix = "js"
 		if installSuffix != "" {
 			bctx.InstallSuffix += "_" + installSuffix
@@ -120,9 +122,11 @@ func importWithSrcDir(path string, srcDir string, mode build.ImportMode, install
 		pkg.GoFiles = []string{"rand.go", "util.go"}
 	}
 
-	if len(pkg.CgoFiles) > 0 {
-		return nil, &ImportCError{path}
-	}
+	/*
+		if len(pkg.CgoFiles) > 0 {
+			return nil, &ImportCError{path}
+		}
+	*/
 
 	if pkg.IsCommand() {
 		pkg.PkgObj = filepath.Join(pkg.BinDir, filepath.Base(pkg.ImportPath)+".js")

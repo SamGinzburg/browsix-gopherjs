@@ -218,6 +218,16 @@ var USyscalls = (function () {
         this.outstanding[msgId] = cb;
         this.post(msgId, 'unlink', path);
     };
+    USyscalls.prototype.unlinkat = function (fd, path, flags, cb) {
+        var msgId = this.nextMsgId();
+        this.outstanding[msgId] = cb;
+        this.post(msgId, 'unlinkat', fd, path, flags);
+    };
+    USyscalls.prototype.flock = function (fd, operation, cb) {
+        var msgId = this.nextMsgId();
+        this.outstanding[msgId] = cb;
+        this.post(msgId, 'flock', fd, operation);
+    };
     USyscalls.prototype.utimes = function (path, atime, mtime, cb) {
         var msgId = this.nextMsgId();
         this.outstanding[msgId] = cb;
@@ -543,9 +553,11 @@ function sys_chdir(cb, trap, path) {
 }
 function sys_ioctl(cb, trap, fd, request, argp) {
     var done = function (err, buf) {
-        if (!err && argp.byteLength !== undefined)
+        if (!err && argp.byteLength !== undefined) {
             argp.set(buf);
-        cb([err ? err : buf.byteLength, 0, err ? -1 : 0]);
+            cb([err ? err : buf.byteLength, 0, err ? -1 : 0]);
+        }
+        cb([err, 0, -1]);
     };
     syscall_1.syscall.ioctl(fd, request, argp.byteLength, done);
 }
@@ -698,6 +710,18 @@ function sys_accept4(cb, trap, fd, buf, lenp) {
 function sys_setsockopt(cb, trap) {
     setTimeout(cb, 0, [0, 0, 0]);
 }
+function sys_unlinkat(cb, trap, fd, path, flags) {
+    var done = function (err) {
+        cb([err ? -1 : 0, 0, err ? -1 : 0]);
+    };
+    syscall_1.syscall.unlinkat(fd, path, flags, done);
+}
+function sys_flock(cb, fd, operation) {
+    var done = function (err) {
+        cb([err ? -1 : 0, 0, err ? -1 : 0]);
+    };
+    syscall_1.syscall.flock(fd, operation, done);
+}
 exports.syscallTbl = [
     sys_read,
     sys_write,
@@ -772,7 +796,7 @@ exports.syscallTbl = [
     sys_ni_syscall,
     sys_ni_syscall,
     sys_fcntl,
-    sys_ni_syscall,
+    sys_flock,
     sys_ni_syscall,
     sys_ni_syscall,
     sys_ni_syscall,
@@ -962,7 +986,7 @@ exports.syscallTbl = [
     sys_ni_syscall,
     sys_ni_syscall,
     sys_ni_syscall,
-    sys_ni_syscall,
+    sys_unlinkat,
     sys_ni_syscall,
     sys_ni_syscall,
     sys_ni_syscall,

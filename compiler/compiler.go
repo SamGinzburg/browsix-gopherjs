@@ -6,13 +6,13 @@ import (
 	"encoding/gob"
 	"encoding/json"
 	"fmt"
+	"go/internal/gcimporter"
 	"go/token"
 	"go/types"
 	"io"
 	"strings"
 
 	"github.com/SamGinzburg/browsix-gopherjs/compiler/prelude"
-	gcimporter "golang.org/x/tools/go/gcimporter15"
 )
 
 var sizes32 = &types.StdSizes{WordSize: 4, MaxAlign: 8}

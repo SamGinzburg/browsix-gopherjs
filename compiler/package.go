@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"go/ast"
 	"go/constant"
+	"go/internal/gcimporter"
 	"go/token"
 	"go/types"
 	"sort"
@@ -14,7 +15,6 @@ import (
 	"github.com/SamGinzburg/browsix-gopherjs/compiler/analysis"
 
 	"github.com/neelance/astrewrite"
-	"golang.org/x/tools/go/gcimporter15"
 	"golang.org/x/tools/go/types/typeutil"
 )
 

@@ -547,7 +547,7 @@ func Compile(importPath string, files []*ast.File, fileSet *token.FileSet, impor
 		ImportPath:   importPath,
 		Name:         typesPkg.Name(),
 		Imports:      importedPaths,
-		ExportData:   exportData,
+		ExportData:   exportData.Bytes(),
 		Declarations: allDecls,
 		FileSet:      encodedFileSet.Bytes(),
 		Minified:     minify,

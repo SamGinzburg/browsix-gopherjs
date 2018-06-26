@@ -76,7 +76,7 @@ func importWithSrcDir(path string, srcDir string, mode build.ImportMode, install
 	case "golang.org/x/sys/unix":
 		// we need to do the same thing as syscall
 		bctx.CgoEnabled = false
-		bctx.GOARCH = "amd64"
+		bctx.GOARCH = "js"
 		bctx.InstallSuffix = "js"
 		if installSuffix != "" {
 			bctx.InstallSuffix += "_" + installSuffix
@@ -85,7 +85,7 @@ func importWithSrcDir(path string, srcDir string, mode build.ImportMode, install
 		// syscall needs to use a typical GOARCH like amd64 to pick up definitions for _Socklen, BpfInsn, IFNAMSIZ, Timeval, BpfStat, SYS_FCNTL, Flock_t, etc.
 		bctx.CgoEnabled = false
 		bctx.GOOS = "linux"
-		bctx.GOARCH = "amd64"
+		bctx.GOARCH = "js"
 		bctx.InstallSuffix = "js"
 		if installSuffix != "" {
 			bctx.InstallSuffix += "_" + installSuffix

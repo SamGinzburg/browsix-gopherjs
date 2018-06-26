@@ -85,7 +85,7 @@ func importWithSrcDir(path string, srcDir string, mode build.ImportMode, install
 		// syscall needs to use a typical GOARCH like amd64 to pick up definitions for _Socklen, BpfInsn, IFNAMSIZ, Timeval, BpfStat, SYS_FCNTL, Flock_t, etc.
 		bctx.CgoEnabled = false
 		bctx.GOOS = "linux"
-		bctx.GOARCH = "js"
+		bctx.GOARCH = "amd64"
 		bctx.InstallSuffix = "js"
 		if installSuffix != "" {
 			bctx.InstallSuffix += "_" + installSuffix

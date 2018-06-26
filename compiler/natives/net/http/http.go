@@ -13,24 +13,6 @@ import (
 	"github.com/SamGinzburg/browsix-gopherjs/js"
 )
 
-var DefaultTransport = func() RoundTripper {
-	switch {
-	case js.Global.Get("fetch") != js.Undefined && js.Global.Get("ReadableStream") != js.Undefined: // ReadableStream is used as a check for support of streaming response bodies, see https://fetch.spec.whatwg.org/#streams.
-		return &XHRTransport{} // use this anyways
-	case js.Global.Get("XMLHttpRequest") != js.Undefined:
-		return &XHRTransport{}
-	default:
-		return noTransport{}
-	}
-}()
-
-// noTransport is used when neither Fetch API nor XMLHttpRequest API are available. It always fails.
-type noTransport struct{}
-
-func (noTransport) RoundTrip(req *Request) (*Response, error) {
-	return nil, errors.New("net/http: neither of Fetch nor XMLHttpRequest APIs is available")
-}
-
 type XHRTransport struct {
 	inflight map[*Request]*js.Object
 }
